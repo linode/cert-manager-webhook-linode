@@ -1,0 +1,32 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: cert-manager-webhook-linode
+  namespace: cert-manager
+spec:
+  interval: 1m0s
+  type: oci
+  url: oci://ghcr.io/linode/cert-manager-webhook-linode
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: cert-manager-webhook-linode
+  namespace: cert-manager
+spec:
+  chart:
+    spec:
+      chart: charts/webhook
+      reconcileStrategy: ChartVersion
+      sourceRef:
+        kind: HelmRepository
+        name: cert-manager-webhook-linode
+        namespace: flux-system
+      version: v0.4.0
+  interval: 1m0s
+  releaseName: cert-manager-webhook-linode
+  targetNamespace: cert-manager
+  values:
+    image:
+      tag: v0.4.0

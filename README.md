@@ -4,16 +4,17 @@
 [![Releases](https://img.shields.io/github/v/release/slicen/cert-manager-webhook-linode?include_prereleases)](https://github.com/slicen/cert-manager-webhook-linode/releases)
 [![LICENSE](https://img.shields.io/github/license/slicen/cert-manager-webhook-linode)](https://github.com/slicen/cert-manager-webhook-linode/blob/master/LICENSE)
 
-A webhook to use [Linode DNS
-Manager](https://www.linode.com/docs/platform/manager/dns-manager) as a DNS01
+A webhook to use [Linode DNS Manager](https://www.linode.com/docs/platform/manager/dns-manager) as a DNS01
 ACME Issuer for [cert-manager](https://github.com/jetstack/cert-manager).
 
 ## Installation
 
 ```bash
 helm install cert-manager-webhook-linode \
+  oci://ghcr.io/linode/cert-manager-webhook-linode/charts/webhook \
   --namespace cert-manager \
-  https://github.com/linode/cert-manager-webhook-linode/releases/download/v0.3.0/cert-manager-webhook-linode-v0.3.0.tgz
+  --version vX.Y.Z \
+  --set image.tag=vX.Y.Z
 ```
 
 ## Usage

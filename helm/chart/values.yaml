@@ -19,7 +19,7 @@ deployment:
   logLevel: 6
 
 image:
-  repository: slicen/cert-manager-webhook-linode
+  repository: ghcr.io/linode/cert-manager-webhook-linode
   tag: latest
   pullPolicy: IfNotPresent
 

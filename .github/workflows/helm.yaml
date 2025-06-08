@@ -1,0 +1,55 @@
+name: Release Charts
+
+on:
+  push:
+    tags:
+    - v\d+\.\d+\.\d+
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  oci-release:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: stable
+    - name: Set up Helm
+      uses: azure/setup-helm@v3
+    - name: Log in to the Container registry
+      uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Setup oras
+      uses: oras-project/setup-oras@v1
+    - name: Package Helm Chart
+      id: helm-packages
+      run: |
+
+        helm package ./helm/chart --version $GITHUB_REF_NAME --app-version $GITHUB_REF_NAME
+        tar zxvf cert-manager-webhook-linode-$GITHUB_REF_NAME.tgz cert-manager-webhook-linode/Chart.yaml
+    - name: Publish OCI Artifact
+      id: oras-push
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        go install github.com/itchyny/gojq/cmd/gojq@latest
+        cat cert-manager-webhook-linode/Chart.yaml | gojq --yaml-input > config.json
+        oras push ghcr.io/$GITHUB_REPOSITORY/charts/webhook:$GITHUB_REF_NAME \
+          --annotation org.opencontainers.image.created=$(date +"%FT%T%:z") \
+          --annotation org.opencontainers.image.description="A Helm chart for cert-manager-webhook-linode" \
+          --annotation org.opencontainers.image.title=cert-manager-webhook-linode \
+          --annotation org.opencontainers.image.version=$GITHUB_REF_NAME \
+          --annotation org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY \
+          --config config.json:application/vnd.cncf.helm.config.v1+json \
+          cert-manager-webhook-linode-$GITHUB_REF_NAME.tgz:application/vnd.cncf.helm.chart.content.v1.tar+gzip
+        oras tag ghcr.io/$GITHUB_REPOSITORY/charts/webhook:$GITHUB_REF_NAME latest
