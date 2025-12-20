@@ -80,6 +80,27 @@ spec:
             key: token
 ```
 
+### Delegated Subdomain Zones
+
+This webhook supports delegated subdomain zones. When you request a certificate
+for a domain, the webhook will automatically find the longest matching zone in
+your Linode DNS Manager.
+
+For example, if you have the following zones configured:
+- `example.com`
+- `team.example.com`
+- `to.example.com`
+
+The webhook will correctly handle certificates for:
+- `www.example.com` → uses zone `example.com`
+- `www.team.example.com` → uses zone `team.example.com`
+- `www.to.example.com` → uses zone `to.example.com`
+- `team.to.example.com` → uses zone `to.example.com` (cross-zone domain)
+- `to.team.example.com` → uses zone `team.example.com` (cross-zone domain)
+
+This is particularly useful when you have delegated DNS management for specific
+subdomains to different zones in Linode DNS Manager.
+
 ## Development
 
 ### Running the test suite
