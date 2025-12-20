@@ -129,21 +129,39 @@ func (c *linodeDNSProviderSolver) getLinodeClient(ch *v1alpha1.ChallengeRequest)
 }
 
 // Returns all record entries in a given Linode DNS Manager zone, specified by the domain parameter
-func (c *linodeDNSProviderSolver) fetchZone(linodeClient *linodego.Client, domain string) (*linodego.Domain, error) {
+// Finds the longest matching zone suffix to support delegated subdomains (e.g., sub.example.com zone)
+// Returns: zone, domainPrefix (empty if exact match, otherwise the part before the zone), error
+func (c *linodeDNSProviderSolver) fetchZone(linodeClient *linodego.Client, domain string) (*linodego.Domain, string, error) {
 	// List domains
 	allZones, err := linodeClient.ListDomains(c.ctx, linodego.NewListOptions(0, ""))
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	// Search for desired zone in domains
+	// Find the longest matching zone suffix
+	// This supports delegated subdomains like team.example.com or to.example.com
+	var bestMatch *linodego.Domain
+	bestPrefix := ""
+	bestMatchLen := 0
+
 	for _, zone := range allZones {
-		if zone.Domain == domain {
-			return &zone, nil
+		zoneName := zone.Domain
+		// Check if domain equals zone or ends with ".zone"
+		if domain == zoneName {
+			// Exact match - return immediately with empty prefix
+			return &zone, "", nil
+		} else if strings.HasSuffix(domain, "."+zoneName) {
+			// Zone is a suffix of domain - extract the prefix and check if it's the longest match
+			if len(zoneName) > bestMatchLen {
+				zoneCopy := zone
+				bestMatch = &zoneCopy
+				bestPrefix = strings.TrimSuffix(domain, "."+zoneName)
+				bestMatchLen = len(zoneName)
+			}
 		}
 	}
 
-	return nil, nil
+	return bestMatch, bestPrefix, nil
 }
 
 // Returns the details of a given record entry in a given Linode DNS Manager zone, specified by the zone's ID and the record
@@ -165,21 +183,32 @@ func (c *linodeDNSProviderSolver) fetchRecord(linodeClient *linodego.Client, zon
 }
 
 // Returns the details of a given record entry in Linode DNS Manager, specified by the domain and record
-// Wraper for fetchZone and fetchRecord
-func (c *linodeDNSProviderSolver) fetchZoneAndRecord(linodeClient *linodego.Client, domain string, entry string) (*linodego.Domain, *linodego.DomainRecord, error) {
-	zone, err := c.fetchZone(linodeClient, domain)
+// Wrapper for fetchZone and fetchRecord
+func (c *linodeDNSProviderSolver) fetchZoneAndRecord(linodeClient *linodego.Client, domain string, entry string) (*linodego.Domain, *linodego.DomainRecord, string, error) {
+	zone, domainPrefix, err := c.fetchZone(linodeClient, domain)
 	if err != nil {
-		return zone, nil, fmt.Errorf("Failed to fetch zone `%s`: %v", domain, err)
+		return zone, nil, "", fmt.Errorf("Failed to fetch zone `%s`: %v", domain, err)
 	} else if zone == nil {
-		return zone, nil, fmt.Errorf("Failed to find zone for `%s`", domain)
+		return zone, nil, "", fmt.Errorf("Failed to find zone for `%s`", domain)
 	}
 
-	record, err := c.fetchRecord(linodeClient, zone.ID, entry)
+	// Calculate entry name based on actual zone found
+	actualEntry := entry
+	if domainPrefix != "" {
+		// Zone is a parent of domain - combine entry with domain prefix
+		if entry != "" {
+			actualEntry = entry + "." + domainPrefix
+		} else {
+			actualEntry = domainPrefix
+		}
+	}
+
+	record, err := c.fetchRecord(linodeClient, zone.ID, actualEntry)
 	if err != nil {
-		return zone, record, fmt.Errorf("Failed to fetch record `%s` in zone `%s`: %v", entry, domain, err)
+		return zone, record, actualEntry, fmt.Errorf("Failed to fetch record `%s` in zone `%s`: %v", actualEntry, zone.Domain, err)
 	}
 
-	return zone, record, nil
+	return zone, record, actualEntry, nil
 }
 
 // Present is responsible for actually presenting the DNS record with the
@@ -197,7 +226,7 @@ func (c *linodeDNSProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error {
 
 	entry, domain := c.getDomainAndEntry(ch)
 
-	zone, record, err := c.fetchZoneAndRecord(linodeClient, domain, entry)
+	zone, record, actualEntry, err := c.fetchZoneAndRecord(linodeClient, domain, entry)
 	if err != nil {
 		return err
 	}
@@ -223,12 +252,12 @@ func (c *linodeDNSProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error {
 		}
 	} else {
 		// Create if it does not exist
-		klog.Infof("Creating new record `%s` in zone `%s`", entry, zone.Domain)
+		klog.Infof("Creating new record `%s` in zone `%s`", actualEntry, zone.Domain)
 		_, err := linodeClient.CreateDomainRecord(
 			c.ctx,
 			zone.ID,
 			linodego.DomainRecordCreateOptions{
-				Name:     entry,
+				Name:     actualEntry,
 				Target:   ch.Key,
 				Type:     linodego.RecordTypeTXT,
 				Weight:   getWeight(),
@@ -276,7 +305,7 @@ func (c *linodeDNSProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
 
 	entry, domain := c.getDomainAndEntry(ch)
 
-	zone, record, err := c.fetchZoneAndRecord(linodeClient, domain, entry)
+	zone, record, _, err := c.fetchZoneAndRecord(linodeClient, domain, entry)
 	if err != nil {
 		return err
 	}
