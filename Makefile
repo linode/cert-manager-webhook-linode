@@ -11,17 +11,20 @@ $(shell mkdir -p "$(OUT)")
 
 .PHONY: verify test build clean _out/kubebuilder rendered-manifest.yaml
 
+ENVTEST_K8S_VERSION = ${K8S_VERSION}
+ENVTEST = $(shell pwd)/_out/setup-envtest
+
 verify: _out/kubebuilder
-	TEST_ASSET_ETCD=_out/kubebuilder/bin/etcd \
-	TEST_ASSET_KUBECTL=_out/kubebuilder/bin/kubectl \
-	TEST_ASSET_KUBE_APISERVER=_out/kubebuilder/bin/kube-apiserver \
+	TEST_ASSET_ETCD=_out/kubebuilder/bin/k8s/$(ENVTEST_K8S_VERSION)-$(shell go env GOOS)-$(shell go env GOARCH)/etcd \
+	TEST_ASSET_KUBECTL=_out/kubebuilder/bin/k8s/$(ENVTEST_K8S_VERSION)-$(shell go env GOOS)-$(shell go env GOARCH)/kubectl \
+	TEST_ASSET_KUBE_APISERVER=_out/kubebuilder/bin/k8s/$(ENVTEST_K8S_VERSION)-$(shell go env GOOS)-$(shell go env GOARCH)/kube-apiserver \
 	go test -v
 
-_out/kubebuilder:
-	mkdir -p _out/kubebuilder
-	curl -fsSLo envtest-bins.tar.gz "https://go.kubebuilder.io/test-tools/${K8S_VERSION}/$(shell go env GOOS)/$(shell go env GOARCH)"
-	tar -C _out/kubebuilder --strip-components=1 -zvxf envtest-bins.tar.gz
-	rm envtest-bins.tar.gz
+_out/kubebuilder: $(ENVTEST)
+	$(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir _out/kubebuilder/bin
+
+$(ENVTEST):
+	GOBIN=$(shell pwd)/_out go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 
 test: verify
 

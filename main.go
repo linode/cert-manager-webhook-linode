@@ -334,7 +334,8 @@ func (c *linodeDNSProviderSolver) stringFromSecret(namespace, secretName, key st
 			key, namespace, secretName)
 	}
 
-	token := string(tokenBinary)
+	// Trim whitespace (including newlines) to prevent invalid HTTP headers
+	token := strings.TrimSpace(string(tokenBinary))
 	return &token, nil
 }
 
