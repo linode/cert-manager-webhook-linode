@@ -19,9 +19,9 @@ deployment:
   logLevel: 6
 
 image:
-  repository: slicen/cert-manager-webhook-linode
+  repository: linode/cert-manager-webhook-linode
   tag: latest
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
 
 nameOverride: ""
 fullnameOverride: ""
