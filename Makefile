@@ -1,5 +1,5 @@
 IMAGE_NAME := "linode/cert-manager-webhook-linode"
-IMAGE_TAG := "v0.4.0"
+IMAGE_TAG := "v0.4.1"
 
 K8S_VERSION := "1.35.0"
 
