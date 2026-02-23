@@ -13,7 +13,7 @@ ACME Issuer for [cert-manager](https://github.com/jetstack/cert-manager).
 ```bash
 helm install cert-manager-webhook-linode \
   --namespace cert-manager \
-  https://github.com/linode/cert-manager-webhook-linode/releases/download/v0.4.0/cert-manager-webhook-linode-v0.4.0.tgz
+  https://github.com/linode/cert-manager-webhook-linode/releases/download/v0.4.1/cert-manager-webhook-linode-v0.4.1.tgz
 ```
 
 ## Usage
